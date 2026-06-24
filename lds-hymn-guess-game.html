@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LDS Lyricosis</title>
+  <style>
+    :root {
+      --bg: #1a2744; --card: #243352; --accent: #c9a227;
+      --text: #f4f0e6; --muted: #a8b4c8; --success: #4caf82; --danger: #e05c5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(circle at top, #2a3f6b, var(--bg));
+      color: var(--text); padding: 24px;
+    }
+    h1 { margin: 0 0 4px; font-size: 1.75rem; color: var(--accent); }
+    .subtitle { color: var(--muted); margin-bottom: 20px; }
+    .layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; max-width: 1100px; margin: 0 auto; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .panel { background: var(--card); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px; }
+    .tip {
+      background: rgba(76,175,130,0.12); border: 1px solid rgba(76,175,130,0.3);
+      border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+      font-size: 0.9rem; color: #d7efe3; line-height: 1.45;
+    }
+    .badge {
+      display: inline-block; background: rgba(201,162,39,0.15);
+      border: 1px solid rgba(201,162,39,0.35); color: var(--accent);
+      padding: 6px 12px; border-radius: 999px; font-size: 0.9rem; font-weight: 600; margin-right: 8px;
+    }
+    .big-stat { font-size: 2.2rem; font-weight: 700; margin: 10px 0 4px; }
+    .sub-stat { color: var(--muted); margin-bottom: 16px; }
+    .points-available { color: var(--success); font-size: 1.1rem; font-weight: 600; margin-bottom: 18px; }
+    .progress-wrap { background: rgba(0,0,0,0.25); border-radius: 999px; height: 10px; margin-bottom: 18px; overflow: hidden; }
+    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    button {
+      cursor: pointer; border: none; border-radius: 10px;
+      padding: 12px 18px; font-size: 1rem; font-weight: 600;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #1a1508; }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: var(--text); }
+    .btn-danger { background: var(--danger); color: white; }
+    .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; max-height: 320px; overflow-y: auto; }
+    .team-btn {
+      background: rgba(76,175,130,0.18); border: 2px solid rgba(76,175,130,0.45);
+      color: var(--text); padding: 10px 8px; border-radius: 10px; font-size: 0.9rem;
+    }
+    .answer { margin-top: 16px; padding: 14px; border-radius: 10px; background: rgba(0,0,0,0.2); }
+    .answer.hidden { filter: blur(6px); user-select: none; }
+    .settings h2 { margin: 0 0 12px; font-size: 1.1rem; color: var(--accent); }
+    label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 0.9rem; }
+    select, input[type="number"] {
+      width: 100%; padding: 10px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.25); color: var(--text);
+    }
+    .song-list { margin-top: 16px; font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+    .song-list li.done { color: var(--success); text-decoration: line-through; }
+    .song-list li.current { color: var(--accent); font-weight: 700; }
+    .help { margin-top: 16px; font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+    .warn { color: #ffb4b4; font-size: 0.85rem; margin-top: 8px; display: none; }
+    .warn.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="panel">
+      <h1>LDS Lyricosis</h1>
+      <p class="subtitle">Real hymn recordings — each click plays more of the song from the beginning.</p>
+
+      <div class="tip">
+        <strong>Offline ready.</strong> Hymn audio is saved in the <code>audio</code> folder (~140 MB).
+        Copy the whole folder to your laptop for camp — no internet needed.
+      </div>
+
+      <div>
+        <span class="badge" id="roundBadge">Round 1 of 10</span>
+        <span class="badge" id="statusBadge">Ready</span>
+      </div>
+
+      <div class="big-stat"><span id="secondsPlayed">0</span>s heard</div>
+      <div class="sub-stat">Clip <span id="clipCount">0</span> of <span id="clipTotal">0</span></div>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="points-available">Points if guessed now: <span id="pointsNow">10</span></div>
+
+      <div class="controls">
+        <button class="btn-primary" id="playBtn">▶ Play more of the song</button>
+        <button class="btn-secondary" id="replayBtn">↺ Replay from start</button>
+        <button class="btn-secondary" id="revealBtn">Reveal answer</button>
+        <button class="btn-secondary" id="skipBtn">Skip song</button>
+        <button class="btn-primary" id="nextSongBtn" style="display:none">Next song →</button>
+      </div>
+
+      <p style="margin:0 0 8px;color:var(--muted);font-size:0.95rem;">Team guessed correctly:</p>
+      <div class="team-grid" id="teamGrid"></div>
+
+      <div class="answer hidden" id="answerBox">
+        <strong>Answer:</strong> <span id="answerText"></span>
+      </div>
+      <p class="warn" id="audioWarn">Could not load audio — keep the <code>audio</code> folder next to this file.</p>
+
+      <div class="help">
+        Each click replays from the <strong>start</strong> but plays longer (1s → 2s → 3s… on Hard).
+        Teams buzz in when they know it. Fewer clips heard = more points.
+        Familiar songs come first, then lesser-known hymns.
+      </div>
+    </section>
+
+    <aside>
+      <div class="panel settings">
+        <h2>Settings</h2>
+
+        <label for="difficulty">How much to reveal each click</label>
+        <select id="difficulty">
+          <option value="easy">Easy — 3s, 6s, 10s, 15s, full</option>
+          <option value="medium">Medium — 2s, 4s, 7s, 10s, 15s</option>
+          <option value="hard" selected>Hard — 1s, 2s, 3s, 5s, 7s, 9s, 12s</option>
+        </select>
+
+        <label for="songOrder">Song order</label>
+        <select id="songOrder">
+          <option value="progressive" selected>Familiar first → lesser known</option>
+          <option value="random">Random shuffle</option>
+        </select>
+
+        <label for="audioType">Recording type</label>
+        <select id="audioType">
+          <option value="vocal" selected>Vocal + accompaniment (easiest to recognize)</option>
+          <option value="inst">Instrumental only</option>
+        </select>
+
+        <label for="teamCount">Teams</label>
+        <select id="teamCount">
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+        </select>
+
+        <label for="maxPoints">Max points</label>
+        <input type="number" id="maxPoints" min="5" max="20" value="10" />
+
+        <button class="btn-secondary" id="shuffleBtn" style="width:100%;margin-top:14px">Shuffle order</button>
+        <button class="btn-danger" id="restartBtn" style="width:100%;margin-top:8px">Restart</button>
+        <ol class="song-list" id="songList"></ol>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const AUDIO = "audio";
+    const SONGS = [
+      {
+        title: "Popcorn Popping",
+        number: "CS 242",
+        tier: "familiar",
+        vocal: `${AUDIO}/popcorn-popping-vocal.mp3`,
+        inst: `${AUDIO}/popcorn-popping-inst.mp3`,
+      },
+      {
+        title: "Book of Mormon Stories",
+        number: "CS 118",
+        tier: "familiar",
+        vocal: `${AUDIO}/book-of-mormon-stories-vocal.mp3`,
+        inst: `${AUDIO}/book-of-mormon-stories-vocal.mp3`,
+      },
+      {
+        title: "I Am a Child of God",
+        number: "Hymn 301",
+        tier: "familiar",
+        vocal: `${AUDIO}/i-am-a-child-of-god-vocal.mp3`,
+        inst: `${AUDIO}/i-am-a-child-of-god-inst.mp3`,
+      },
+      {
+        title: "Called to Serve",
+        number: "Hymn 249",
+        tier: "familiar",
+        vocal: `${AUDIO}/called-to-serve-vocal.mp3`,
+        inst: `${AUDIO}/called-to-serve-inst.mp3`,
+      },
+      {
+        title: "We'll Bring the World His Truth",
+        number: "CS 172",
+        tier: "familiar",
+        vocal: `${AUDIO}/army-of-helaman-vocal.mp3`,
+        inst: `${AUDIO}/army-of-helaman-vocal.mp3`,
+      },
+      {
+        title: "Come, Come, Ye Saints",
+        number: "Hymn 30",
+        tier: "familiar",
+        vocal: `${AUDIO}/come-come-ye-saints-vocal.mp3`,
+        inst: `${AUDIO}/come-come-ye-saints-inst.mp3`,
+      },
+      {
+        title: "The Spirit of God",
+        number: "Hymn 2",
+        tier: "familiar",
+        vocal: `${AUDIO}/spirit-of-god-vocal.mp3`,
+        inst: `${AUDIO}/spirit-of-god-inst.mp3`,
+      },
+      {
+        title: "High on the Mountain Top",
+        number: "Hymn 5",
+        tier: "familiar",
+        vocal: `${AUDIO}/high-on-the-mountain-top-vocal.mp3`,
+        inst: `${AUDIO}/high-on-the-mountain-top-inst.mp3`,
+      },
+      {
+        title: "Choose the Right",
+        number: "Hymn 239",
+        tier: "familiar",
+        vocal: `${AUDIO}/choose-the-right-vocal.mp3`,
+        inst: `${AUDIO}/choose-the-right-vocal.mp3`,
+      },
+      {
+        title: "Families Can Be Together Forever",
+        number: "Hymn 300",
+        tier: "familiar",
+        vocal: `${AUDIO}/families-forever-vocal.mp3`,
+        inst: `${AUDIO}/families-forever-inst.mp3`,
+      },
+      {
+        title: "Put Your Shoulder to the Wheel",
+        number: "CS 252",
+        tier: "obscure",
+        vocal: `${AUDIO}/put-your-shoulder-to-the-wheel-vocal.mp3`,
+        inst: `${AUDIO}/put-your-shoulder-to-the-wheel-inst.mp3`,
+      },
+      {
+        title: "Pioneer Children Sang As They Walked",
+        number: "CS 214",
+        tier: "obscure",
+        vocal: `${AUDIO}/pioneer-children-vocal.mp3`,
+        inst: `${AUDIO}/pioneer-children-vocal.mp3`,
+      },
+      {
+        title: "On a Golden Springtime",
+        number: "CS 88",
+        tier: "obscure",
+        vocal: `${AUDIO}/on-a-golden-springtime-vocal.mp3`,
+        inst: `${AUDIO}/on-a-golden-springtime-vocal.mp3`,
+      },
+      {
+        title: "Teach Me to Walk in the Light",
+        number: "CS 177",
+        tier: "obscure",
+        vocal: `${AUDIO}/teach-me-to-walk-vocal.mp3`,
+        inst: `${AUDIO}/teach-me-to-walk-inst.mp3`,
+      },
+      {
+        title: "Search, Ponder, and Pray",
+        number: "CS 109",
+        tier: "obscure",
+        vocal: `${AUDIO}/search-ponder-and-pray-vocal.mp3`,
+        inst: `${AUDIO}/search-ponder-and-pray-vocal.mp3`,
+      },
+      {
+        title: "Dear to the Heart of the Shepherd",
+        number: "Hymn 221",
+        tier: "obscure",
+        vocal: `${AUDIO}/dear-to-the-shepherd-vocal.mp3`,
+        inst: `${AUDIO}/dear-to-the-shepherd-inst.mp3`,
+      },
+      {
+        title: "Israel, Israel, God Is Calling",
+        number: "Hymn 7",
+        tier: "obscure",
+        vocal: `${AUDIO}/israel-god-is-calling-vocal.mp3`,
+        inst: `${AUDIO}/israel-god-is-calling-inst.mp3`,
+      },
+      {
+        title: "Abide with Me! 'Tis Eventide",
+        number: "Hymn 166",
+        tier: "obscure",
+        vocal: `${AUDIO}/abide-with-me-vocal.mp3`,
+        inst: `${AUDIO}/abide-with-me-inst.mp3`,
+      },
+      {
+        title: "Our Savior's Love",
+        number: "Hymn 113",
+        tier: "obscure",
+        vocal: `${AUDIO}/our-saviors-love-vocal.mp3`,
+        inst: `${AUDIO}/our-saviors-love-inst.mp3`,
+      },
+      {
+        title: "As Sisters in Zion",
+        number: "Hymn 309",
+        tier: "obscure",
+        vocal: `${AUDIO}/as-sisters-in-zion-vocal.mp3`,
+        inst: `${AUDIO}/as-sisters-in-zion-inst.mp3`,
+      },
+    ];
+
+    const CLIPS = {
+      easy: [3, 6, 10, 15, 999],
+      medium: [2, 4, 7, 10, 15],
+      hard: [1, 2, 3, 5, 7, 9, 12],
+    };
+
+    const MAX_TEAMS = 15;
+    const TEAM_NAMES = Array.from({ length: MAX_TEAMS }, (_, i) => `Team ${i + 1}`);
+
+    function freshScores() {
+      return Array(MAX_TEAMS).fill(0);
+    }
+
+    let songOrder = [], roundIndex = 0, clipIndex = 0;
+    let roundResolved = false, teamCount = 3, maxPoints = 10;
+    let difficulty = "hard", audioType = "vocal", songOrderMode = "progressive", scores = freshScores();
+    let audio = new Audio(), stopTimer = null, isPlaying = false;
+
+    function currentSong() { return SONGS[songOrder[roundIndex]]; }
+
+    function getClips() { return CLIPS[difficulty]; }
+
+    function currentClipSeconds() {
+      const clips = getClips();
+      if (clipIndex >= clips.length) return clips[clips.length - 1];
+      return clips[clipIndex];
+    }
+
+    function heardSeconds() {
+      if (clipIndex === 0) return 0;
+      const clips = getClips();
+      return clips[clipIndex - 1];
+    }
+
+    function pointsNow() {
+      if (clipIndex === 0) return maxPoints;
+      return Math.max(1, maxPoints - clipIndex + 1);
+    }
+
+    function songAudioUrl(song) {
+      return audioType === "vocal" ? song.vocal : song.inst;
+    }
+
+    function loadAudio() {
+      const song = currentSong();
+      audio.pause();
+      clearTimeout(stopTimer);
+      audio = new Audio();
+      audio.preload = "auto";
+      audio.src = songAudioUrl(song);
+      audio.onerror = () => document.getElementById("audioWarn").classList.add("show");
+      audio.oncanplay = () => document.getElementById("audioWarn").classList.remove("show");
+    }
+
+    function playClip(seconds) {
+      clearTimeout(stopTimer);
+      audio.pause();
+      audio.currentTime = 0;
+
+      const playPromise = audio.play();
+      if (playPromise) playPromise.catch(() => {
+        document.getElementById("audioWarn").classList.add("show");
+        isPlaying = false;
+        updateUI();
+      });
+
+      isPlaying = true;
+      document.getElementById("statusBadge").textContent = "Playing…";
+
+      const ms = seconds >= 999 ? (audio.duration || 60) * 1000 : seconds * 1000;
+      stopTimer = setTimeout(() => {
+        audio.pause();
+        isPlaying = false;
+        document.getElementById("statusBadge").textContent = "Listening…";
+        updateUI();
+      }, ms + 100);
+    }
+
+    function updateUI() {
+      const song = currentSong();
+      const clips = getClips();
+      const heard = heardSeconds();
+      const maxSec = clips[clips.length - 1];
+
+      document.getElementById("roundBadge").textContent = `Round ${roundIndex + 1} of ${SONGS.length}`;
+      document.getElementById("clipCount").textContent = String(clipIndex);
+      document.getElementById("clipTotal").textContent = String(clips.length);
+      document.getElementById("secondsPlayed").textContent = heard >= 999 ? "Full" : String(heard);
+      document.getElementById("pointsNow").textContent = clipIndex === 0 ? maxPoints : pointsNow();
+      document.getElementById("answerText").textContent = `${song.title} (${song.number})`;
+      document.getElementById("progressBar").style.width = `${Math.min(100, (heard / (maxSec >= 999 ? 20 : maxSec)) * 100)}%`;
+      document.getElementById("playBtn").disabled = roundResolved || isPlaying || clipIndex >= clips.length;
+      document.getElementById("nextSongBtn").style.display = roundResolved ? "inline-block" : "none";
+
+      document.getElementById("songList").innerHTML = songOrder.map((idx, i) => {
+        const s = SONGS[idx];
+        const cls = i < roundIndex ? "done" : i === roundIndex ? "current" : "";
+        const tier = s.tier === "obscure" ? " · lesser known" : "";
+        return `<li class="${cls}">${i + 1}. ${s.title}${tier}</li>`;
+      }).join("");
+
+      document.getElementById("teamGrid").innerHTML = TEAM_NAMES.slice(0, teamCount).map((name, i) =>
+        `<button class="team-btn" data-team="${i}" ${roundResolved || clipIndex === 0 ? "disabled" : ""}>${name}<br><small>+${clipIndex === 0 ? maxPoints : pointsNow()} pts</small></button>`
+      ).join("");
+    }
+
+    function playMore() {
+      if (roundResolved || isPlaying) return;
+      const clips = getClips();
+      if (clipIndex >= clips.length) return;
+      const sec = clips[clipIndex];
+      clipIndex += 1;
+      playClip(sec);
+      updateUI();
+    }
+
+    function replay() {
+      if (isPlaying || clipIndex === 0) return;
+      playClip(heardSeconds());
+    }
+
+    function awardTeam(i) {
+      if (roundResolved || clipIndex === 0) { alert("Play at least one clip first."); return; }
+      const pts = pointsNow();
+      scores[i] += pts;
+      roundResolved = true;
+      clearTimeout(stopTimer);
+      audio.pause();
+      isPlaying = false;
+      document.getElementById("statusBadge").textContent = `${TEAM_NAMES[i]} +${pts}!`;
+      document.getElementById("answerBox").classList.remove("hidden");
+      updateUI();
+    }
+
+    function nextSong() {
+      if (roundIndex >= SONGS.length - 1) {
+        alert(`Game over!\n\n${TEAM_NAMES.slice(0, teamCount).map((n, i) => `${n}: ${scores[i]}`).join("\n")}`);
+        return;
+      }
+      roundIndex++;
+      clipIndex = 0;
+      roundResolved = false;
+      loadAudio();
+      document.getElementById("answerBox").classList.add("hidden");
+      document.getElementById("statusBadge").textContent = "Ready";
+      updateUI();
+    }
+
+    function skipSong() {
+      roundResolved = true;
+      clearTimeout(stopTimer);
+      audio.pause();
+      isPlaying = false;
+      document.getElementById("statusBadge").textContent = "Skipped";
+      document.getElementById("answerBox").classList.remove("hidden");
+      updateUI();
+    }
+
+    function shuffleInPlace(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function buildOrder() {
+      if (songOrderMode === "random") {
+        songOrder = shuffleInPlace(SONGS.map((_, i) => i));
+        return;
+      }
+      const familiar = SONGS.map((s, i) => i).filter(i => SONGS[i].tier === "familiar");
+      const obscure = SONGS.map((s, i) => i).filter(i => SONGS[i].tier === "obscure");
+      shuffleInPlace(familiar);
+      shuffleInPlace(obscure);
+      songOrder = [...familiar, ...obscure];
+    }
+
+    function shuffleOrder() {
+      buildOrder();
+      roundIndex = 0;
+      clipIndex = 0;
+      roundResolved = false;
+      loadAudio();
+      document.getElementById("answerBox").classList.add("hidden");
+      updateUI();
+    }
+
+    document.getElementById("playBtn").addEventListener("click", playMore);
+    document.getElementById("replayBtn").addEventListener("click", replay);
+    document.getElementById("revealBtn").addEventListener("click", () => document.getElementById("answerBox").classList.remove("hidden"));
+    document.getElementById("skipBtn").addEventListener("click", skipSong);
+    document.getElementById("nextSongBtn").addEventListener("click", nextSong);
+    document.getElementById("shuffleBtn").addEventListener("click", shuffleOrder);
+    document.getElementById("restartBtn").addEventListener("click", () => { scores = freshScores(); shuffleOrder(); });
+    document.getElementById("teamCount").addEventListener("change", e => { teamCount = +e.target.value; updateUI(); });
+    document.getElementById("maxPoints").addEventListener("change", e => { maxPoints = Math.max(5, +e.target.value || 10); updateUI(); });
+    document.getElementById("difficulty").addEventListener("change", e => { difficulty = e.target.value; clipIndex = 0; roundResolved = false; document.getElementById("answerBox").classList.add("hidden"); updateUI(); });
+    document.getElementById("songOrder").addEventListener("change", e => { songOrderMode = e.target.value; shuffleOrder(); });
+    document.getElementById("audioType").addEventListener("change", e => { audioType = e.target.value; loadAudio(); updateUI(); });
+    document.getElementById("teamGrid").addEventListener("click", e => {
+      const btn = e.target.closest("[data-team]");
+      if (btn) awardTeam(+btn.dataset.team);
+    });
+
+    shuffleOrder();
+  </script>
+</body>
+</html>
